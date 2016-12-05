@@ -1926,3 +1926,13 @@ for line in lines:
 
 print "possible: ", num_possible
 print "total: ", len(lines)
+
+alt_num_possible = 0
+numbers = [filter(None, line.split('  ')) for line in lines]
+for i in xrange(0, len(numbers), 3):
+    int_numbers = [int(numbers[i]), int(numbers[i + 3]), int(numbers[i + 6])]
+    int_numbers.sort()
+    if int_numbers[0] + int_numbers[1] > int_numbers[2]:
+        alt_num_possible += 1
+
+print "alt: ", alt_num_possible
