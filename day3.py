@@ -1929,10 +1929,16 @@ print "total: ", len(lines)
 
 alt_num_possible = 0
 numbers = [filter(None, line.split('  ')) for line in lines]
-for i in xrange(0, len(numbers), 3):
-    int_numbers = [int(numbers[i]), int(numbers[i + 3]), int(numbers[i + 6])]
-    int_numbers.sort()
-    if int_numbers[0] + int_numbers[1] > int_numbers[2]:
+import itertools
+
+merged_numbers = list(itertools.chain(*numbers))
+int_numbers = [int(num) for num in merged_numbers]
+
+for i in xrange(0, len(int_numbers) / 3):
+    index = i + 6 * (i / 3)
+    triangle = [int_numbers[index], int_numbers[index + 3], int_numbers[index + 6]]
+    triangle.sort()
+    if triangle[0] + triangle[1] > triangle[2]:
         alt_num_possible += 1
 
 print "alt: ", alt_num_possible
