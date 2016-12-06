@@ -609,12 +609,8 @@ def normal():
         row = [v[index] for v in pi]
         c = Counter(row)
         output += c.most_common(1)[0][0]
-        print output
 
     print "normal: ", output
-
-
-normal()
 
 
 def alt():
@@ -625,9 +621,9 @@ def alt():
         row = [v[index] for v in pi]
         c = Counter(row)
         output += c.most_common()[-1][0]
-        print output
 
     print "alt: ", output
 
 
+normal()
 alt()
