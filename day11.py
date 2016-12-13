@@ -2,7 +2,7 @@ import heapq
 from copy import deepcopy
 from itertools import permutations
 
-from day11_input import puzzle_input
+from day11_input import alt_puzzle_input
 
 
 class PriorityQueue:
@@ -21,9 +21,26 @@ class PriorityQueue:
 
 class FloorState(object):
     def __init__(self, state, current_floor):
-        self.state = state
+        self.state = [sorted(floor) for floor in state]
         assert len(state) == 4
         self.current_floor = current_floor
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def __hash__(self):
+        return hash((str(self.state), self.current_floor))
+
+    def __ne__(self, other):
+        # Not strictly necessary, but to avoid having both x==y and x!=y
+        # True at the same time
+        return not (self == other)
+
+    def __eq__(self, other):
+        if self.current_floor == other.current_floor:
+            return self.state == other.state
+
+        return False
 
     def valid_moves(self):
         current_state, current_floor = self.state, self.current_floor
@@ -64,31 +81,28 @@ class FloorState(object):
         return possible_states
 
 
-GENERATOR = 'G'
-MICROCHIP = 'M'
-BOTH = 'B'
+def is_generator(thing):
+    return thing.isupper()
+
+
+def is_microchip(thing):
+    return thing.islower()
 
 
 def floor_is_valid(floor):
     floor.sort()
 
-    # valid if we are all generators
-    all_generators = True
-    for thing in floor:
-        if thing[1] != GENERATOR:
-            all_generators = False
-            break
+    # If we only have one thing we are valid
+    if len(floor) <= 1:
+        return True
 
+    # valid if we are all generators
+    all_generators = is_generator(floor[0]) and is_generator(floor[-1])
     if all_generators:
         return True
 
     # valid if we are all microchips
-    all_microchips = True
-    for thing in floor:
-        if thing[1] != MICROCHIP:
-            all_microchips = False
-            break
-
+    all_microchips = is_microchip(floor[0]) and is_microchip(floor[-1])
     if all_microchips:
         return True
 
@@ -97,16 +111,17 @@ def floor_is_valid(floor):
     for thing in floor:
         is_pair = False
         for other_thing in floor:
-            if thing != other_thing and thing[0] == other_thing[0]:
+            if thing != other_thing and thing.lower() == other_thing.lower():
                 is_pair = True
                 break
 
         if not is_pair:
             without_pairs.append(thing)
 
-    all_generators = True
+    without_pairs.sort()
+    all_generators = len(without_pairs) == 0 or (is_generator(without_pairs[0]) and is_generator(without_pairs[-1]))
     for thing in without_pairs:
-        if thing[1] != GENERATOR:
+        if not is_generator(thing):
             all_generators = False
             break
 
@@ -115,11 +130,11 @@ def floor_is_valid(floor):
 
     # if we are a micro chip and there is a generator that is not ours then we are not valid
     for thing in without_pairs:
-        if thing[1] == MICROCHIP:
+        if is_microchip(thing):
             valid_thing = True
 
             for other_thing in floor:
-                if thing != other_thing and other_thing[1] == GENERATOR:
+                if thing != other_thing and is_generator(other_thing):
                     valid_thing = False
                     break
 
@@ -130,7 +145,10 @@ def floor_is_valid(floor):
 
 
 def heuristic(a, b):
-    return len(a.state[3]) - len(b.state[3])
+    val = 0
+    for index, floor in enumerate(b.state):
+        val += len(floor) * (index + 1)
+    return (len(b.state[0] + b.state[1] + b.state[2] + b.state[3]) * 4) - val
 
 
 def a_star_search(start, goal):
@@ -141,8 +159,14 @@ def a_star_search(start, goal):
     came_from[start] = None
     cost_so_far[start] = 0
 
+    current_max = 0
+
     while not frontier.empty():
         current = frontier.get()
+
+        if len(current.state[3]) > current_max:
+            current_max = len(current.state[3])
+            print 'current_max: ', current_max
 
         if current == goal:
             break
@@ -158,16 +182,27 @@ def a_star_search(start, goal):
     return came_from, cost_so_far
 
 
-def normal():
-    floors = puzzle_input.splitlines()
+def reconstruct_path(came_from, start, goal):
+    current = goal
+    path = [current]
+    while current != start:
+        current = came_from[current]
+        path.append(current)
+    path.append(start)  # optional
+    path.reverse()  # optional
+    return path
+
+
+def normal(text):
+    floors = text.splitlines()
     for index, floor in enumerate(floors):
         floor = floor.split('a ')[1:]
         parts = []
         for part in floor:
             if 'generator' in part:
-                parts.append(part.split(' ')[0][0] + GENERATOR)
+                parts.append(part.split(' ')[0][0].upper())
             elif 'microchip' in part:
-                parts.append(part.split('-')[0][0] + MICROCHIP)
+                parts.append(part.split('-')[0][0])
 
         floors[index] = parts
         print "Floor: ", index + 1, floors[index]
@@ -178,11 +213,13 @@ def normal():
     for floor in floors:
         goal[3].extend(floor)
 
-    print a_star_search(FloorState(floors, 0), FloorState(goal, 3))
+    came_from, cost_so_far = a_star_search(FloorState(floors, 0), FloorState(goal, 3))
+    print "Steps to goal: ", cost_so_far[FloorState(goal, 3)]
+
 
     # Rule 1: Have to have at least one chip or generator to go in lift.
     # Rule 2: Chips will be fried if on the same floor as a generator unless it's their generator
     # Goal: Bring everything to floor 4 in as few steps as possible
 
 
-normal()
+normal(alt_puzzle_input)
