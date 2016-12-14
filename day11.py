@@ -147,8 +147,8 @@ def floor_is_valid(floor):
 def heuristic(a, b):
     val = 0
     for index, floor in enumerate(b.state):
-        val += len(floor) * (index + 1)
-    return (len(b.state[0] + b.state[1] + b.state[2] + b.state[3]) * 4) - val
+        val += len(floor) * pow(index + 1, 1)
+    return pow(val, 2)
 
 
 def a_star_search(start, goal):
@@ -171,7 +171,7 @@ def a_star_search(start, goal):
         if current == goal:
             break
 
-        for next in current.valid_moves():  # graph.neighbors(current):
+        for next in current.valid_moves():
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
