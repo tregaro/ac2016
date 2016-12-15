@@ -1,8 +1,112 @@
 import heapq
-from copy import deepcopy
-from itertools import permutations
 
-from day11_input import alt_puzzle_input
+obj_indices = [
+    'strontium',
+    'strontium generator',
+    'plutonium',
+    'plutonium generator',
+    'thulium',
+    'thulium generator',
+    'ruthenium',
+    'ruthenium generator',
+    'curium',
+    'curium generator',
+    'elerium',
+    'elerium generator',
+    'dilithium',
+    'dilithium generator',
+]
+
+normal_start_state = [1, 1, 1, 1, 3, 2, 2, 2, 2, 2]
+alt_start_state = [1, 1, 1, 1, 3, 2, 2, 2, 2, 2, 1, 1, 1, 1]
+
+
+class FloorState(object):
+    def __init__(self, state, elevator_floor):
+        self.state = state
+        self.elevator_floor = elevator_floor
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def __hash__(self):
+        return hash(str(self.__dict__))
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __eq__(self, other):
+        if self.elevator_floor == other.elevator_floor:
+            return self.state == other.state
+        return False
+
+    def reached_goal(self):
+        return all(floor == 4 for floor in self.state)
+
+    def is_valid(self):
+        # if the elevator is on an invalid floor
+        if not 1 <= self.elevator_floor <= 4:
+            return False
+
+        # if any element is on an invalid floor
+        if any(not 1 <= element <= 4 for element in self.state):
+            return False
+
+        index = 0
+        for chip_floor_num in self.state[::2]:
+            current_index = index
+            index += 2
+            # if we are not on the same floor as our generator
+            if chip_floor_num != self.state[current_index + 1]:
+                # if there are any other generators on this floor
+                if any(chip_floor_num == gen_floor_num for gen_floor_num in self.state[1::2]):
+                    return False
+
+        return True
+
+    def valid_states(self):
+        # This is a generator because why not :)
+        for first_index in range(len(self.state)):
+            # If we are not on the right floor
+            if self.state[first_index] != self.elevator_floor:
+                continue
+
+            new_state = FloorState(list(self.state), self.elevator_floor)
+            # move one thing down
+            new_state.state[first_index] -= 1
+            new_state.elevator_floor -= 1
+            if new_state.is_valid():
+                yield FloorState(list(new_state.state), new_state.elevator_floor)
+
+            # move one thing up
+            new_state.state[first_index] += 2
+            new_state.elevator_floor += 2
+            if new_state.is_valid():
+                yield FloorState(list(new_state.state), new_state.elevator_floor)
+
+            # reset to our initial state
+            new_state.state[first_index] -= 1
+            new_state.elevator_floor -= 1
+
+            for second_index in range(first_index + 1, len(self.state)):
+                # move two things down
+                new_state.state[first_index] -= 1
+                new_state.state[second_index] -= 1
+                new_state.elevator_floor -= 1
+                if new_state.is_valid():
+                    yield FloorState(list(new_state.state), new_state.elevator_floor)
+
+                # move two things up
+                new_state.state[first_index] += 2
+                new_state.state[second_index] += 2
+                new_state.elevator_floor += 2
+                if new_state.is_valid():
+                    yield FloorState(list(new_state.state), new_state.elevator_floor)
+
+                # reset to our initial state
+                new_state.state[first_index] -= 1
+                new_state.state[second_index] -= 1
+                new_state.elevator_floor -= 1
 
 
 class PriorityQueue:
@@ -19,207 +123,32 @@ class PriorityQueue:
         return heapq.heappop(self.elements)[1]
 
 
-class FloorState(object):
-    def __init__(self, state, current_floor):
-        self.state = [sorted(floor) for floor in state]
-        assert len(state) == 4
-        self.current_floor = current_floor
-
-    def __str__(self):
-        return str(self.__dict__)
-
-    def __hash__(self):
-        return hash((str(self.state), self.current_floor))
-
-    def __ne__(self, other):
-        # Not strictly necessary, but to avoid having both x==y and x!=y
-        # True at the same time
-        return not (self == other)
-
-    def __eq__(self, other):
-        if self.current_floor == other.current_floor:
-            return self.state == other.state
-
-        return False
-
-    def valid_moves(self):
-        current_state, current_floor = self.state, self.current_floor
-        possible_states = []
-
-        new_floors = []
-        # going up if we can
-        if current_floor < 3:
-            new_floors.append(current_floor + 1)
-
-        # going down if we can
-        if current_floor > 0:
-            new_floors.append(current_floor - 1)
-
-        for new_floor in new_floors:
-            # moving one thing
-            for thing in current_state[current_floor]:
-                temp_floor_state = current_state[new_floor] + [thing]
-                if floor_is_valid(temp_floor_state):
-                    new_floor_state = deepcopy(self.state)
-                    new_floor_state[new_floor] = temp_floor_state
-                    new_floor_state[current_floor].remove(thing)
-                    possible_states.append(FloorState(new_floor_state, new_floor))
-
-            # moving two things
-            things_permutations = list(permutations(current_state[current_floor], 2))
-            for i in things_permutations:
-                thing_permutations = list(i)
-                if floor_is_valid(thing_permutations):
-                    temp_floor_state = current_state[new_floor] + thing_permutations
-                    if floor_is_valid(temp_floor_state):
-                        new_floor_state = deepcopy(self.state)
-                        new_floor_state[new_floor] = temp_floor_state
-                        new_floor_state[current_floor].remove(thing_permutations[0])
-                        new_floor_state[current_floor].remove(thing_permutations[1])
-                        possible_states.append(FloorState(new_floor_state, new_floor))
-
-        return possible_states
-
-
-def is_generator(thing):
-    return thing.isupper()
-
-
-def is_microchip(thing):
-    return thing.islower()
-
-
-def floor_is_valid(floor):
-    floor.sort()
-
-    # If we only have one thing we are valid
-    if len(floor) <= 1:
-        return True
-
-    # valid if we are all generators
-    all_generators = is_generator(floor[0]) and is_generator(floor[-1])
-    if all_generators:
-        return True
-
-    # valid if we are all microchips
-    all_microchips = is_microchip(floor[0]) and is_microchip(floor[-1])
-    if all_microchips:
-        return True
-
-    # create list without any pairs
-    without_pairs = []
-    for thing in floor:
-        is_pair = False
-        for other_thing in floor:
-            if thing != other_thing and thing.lower() == other_thing.lower():
-                is_pair = True
-                break
-
-        if not is_pair:
-            without_pairs.append(thing)
-
-    without_pairs.sort()
-    all_generators = len(without_pairs) == 0 or (is_generator(without_pairs[0]) and is_generator(without_pairs[-1]))
-    for thing in without_pairs:
-        if not is_generator(thing):
-            all_generators = False
-            break
-
-    if all_generators:
-        return True
-
-    # if we are a micro chip and there is a generator that is not ours then we are not valid
-    for thing in without_pairs:
-        if is_microchip(thing):
-            valid_thing = True
-
-            for other_thing in floor:
-                if thing != other_thing and is_generator(other_thing):
-                    valid_thing = False
-                    break
-
-            if not valid_thing:
-                return False
-
-    return True
-
-
-def heuristic(a, b):
+def heuristic(b):
     val = 0
-    for index, floor in enumerate(b.state):
-        val += len(floor) * pow(index + 1, 1)
+    for floor in b.state:
+        val += 4 - floor
     return pow(val, 2)
 
 
-def a_star_search(start, goal):
+def a_star_search(start):
     frontier = PriorityQueue()
     frontier.put(start, 0)
-    came_from = {}
-    cost_so_far = {}
-    came_from[start] = None
-    cost_so_far[start] = 0
-
-    current_max = 0
+    cost_so_far = {start: 0}
 
     while not frontier.empty():
         current = frontier.get()
+        if current.reached_goal():
+            return cost_so_far[current]
 
-        if len(current.state[3]) > current_max:
-            current_max = len(current.state[3])
-            print 'current_max: ', current_max
-
-        if current == goal:
-            break
-
-        for next in current.valid_moves():
+        for next in current.valid_states():
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
-                priority = new_cost + heuristic(goal, next)
+                priority = new_cost + heuristic(next)
                 frontier.put(next, priority)
-                came_from[next] = current
 
-    return came_from, cost_so_far
-
-
-def reconstruct_path(came_from, start, goal):
-    current = goal
-    path = [current]
-    while current != start:
-        current = came_from[current]
-        path.append(current)
-    path.append(start)  # optional
-    path.reverse()  # optional
-    return path
+    return None
 
 
-def normal(text):
-    floors = text.splitlines()
-    for index, floor in enumerate(floors):
-        floor = floor.split('a ')[1:]
-        parts = []
-        for part in floor:
-            if 'generator' in part:
-                parts.append(part.split(' ')[0][0].upper())
-            elif 'microchip' in part:
-                parts.append(part.split('-')[0][0])
-
-        floors[index] = parts
-        print "Floor: ", index + 1, floors[index]
-
-    # You start on the first floor
-    current_floor = 0
-    goal = [[], [], [], []]
-    for floor in floors:
-        goal[3].extend(floor)
-
-    came_from, cost_so_far = a_star_search(FloorState(floors, 0), FloorState(goal, 3))
-    print "Steps to goal: ", cost_so_far[FloorState(goal, 3)]
-
-
-    # Rule 1: Have to have at least one chip or generator to go in lift.
-    # Rule 2: Chips will be fried if on the same floor as a generator unless it's their generator
-    # Goal: Bring everything to floor 4 in as few steps as possible
-
-
-normal(alt_puzzle_input)
+# print "Normal steps to goal: ", a_star_search(FloorState(normal_start_state, 1))
+print "Alt steps to goal: ", a_star_search(FloorState(alt_start_state, 1))
